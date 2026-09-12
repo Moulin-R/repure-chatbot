@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>美容室レプレ AIカウンセラー</title>
+
+  <!-- 1. React（CDN） -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- 2. フォント -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+  <!-- 3. Babel（onloadでregisterPresetを実行） -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"
+    onload="window.Babel.registerPreset('custom-react-classic',{presets:[[window.Babel.availablePresets['react'],{runtime:'classic'}]]})">
+  </script>
+</head>
+<body style="margin:0;padding:0;">
+  <div id="root"></div>
+  <script type="text/babel" data-presets="custom-react-classic">
+    const { useState, useRef, useEffect } = React;
+
+    /* ========================= サロン基本情報 ========================= */
+    const SALON = {
+      name: "美容室レプレ",
+      address: "栃木県栃木市都賀町平川459-1",
+      station: "東武線合戦場駅 徒歩10分",
+      tel: "0282-51-1879",
+      hours: "9:00〜18:30",
+      closed: "毎週火曜・第3月曜",
+      parking: "あり（5台）",
+      lineId: "@dle3534c",
+      lineUrl: "https://line.me/R/ti/p/@dle3534c",
+      instagram: "@dle3534c",
+      offHoursMessage:
+        "お問い合わせありがとうございます😊\n現在営業時間外になります。\nLINEでのご予約は承っております。営業時間外の場合、返信が遅れることがございますので、あらかじめご了承ください🙏",
+    };
+
+    /* ========================= メニュー ========================= */
+    const MENU = [
+      { name: "カット", price: "¥4,270", time: "60分", note: "シャンプー・ブロー込み" },
+      { name: "パーマ", price: "¥10,920", time: "120分", note: "シャンプー・ブロー込み" },
+      { name: "ファッションカラー", price: "¥7,800〜", time: "80分", note: "シャンプー・ブロー込み" },
+      { name: "グレーカラー", price: "¥7,600〜", time: "80分", note: "シャンプー・ブロー込み" },
+      { name: "ブリーチ", price: "¥10,000〜", time: "120分", note: "シャンプー・ブロー込み" },
+      { name: "システムトリートメント", price: "¥3,800", time: "30分", note: "単品プラス+1,500円" },
+    ];
+
+    const MENU_TEXT = MENU.map(
+      (m) => `・${m.name}：${m.price}（${m.time}／${m.note}）`
+    ).join("\n");
+
+    /* ========================= システムプロンプト ========================= */
+    const SYSTEM_PROMPT = `あなたは「美容室レプレ」のスタッフです。特別なキャラクター名は名乗らず、サロンのスタッフの一人として、あたたかく丁寧に対応してください。
+
+【サロンについて】
+・栃木県栃木市都賀町平川459-1、東武線合戦場駅 徒歩10分
+・営業時間：9:00〜18:30／定休日：毎週火曜・第3月曜
+・駐車場：あり（5台）
+・メインターゲット：30〜60代のお客様
+・ブランドイメージ：親しみやすい・アットホーム
+・お子様連れ来店OK（専用スペースはなく、膝の上でのご利用）
+・外国語対応：英語OK
+・バリアフリー対応あり（車いす対応等）
+・店舗数：1店舗のみ
+
+【話し方のルール】
+1. まずゲストの気持ちに共感し、やさしく受け止める
+2. 不安をあおらない。ポジティブな言葉を中心に使う
+3. 専門用語を避け、わかりやすい言葉で伝える
+4. 押し売り感を出さない。「〜してみませんか？」というやさしい提案にする
+5. 1回の返答は3〜5文程度にまとめる
+6. 絵文字を積極的に使う（😊✨🙌など、明るく親しみやすい雰囲気で）
+7. 敬語だが堅すぎず、親しみやすいトーンにする（やわらかい敬語）
+
+【メニュー・料金】
+${MENU_TEXT}
+・同日に複数メニューの組み合わせ可能（例：カラー＋トリートメントOK）
+・指名料：なし（藤沼匡史スタイリストのご指名が可能です）
+
+【予約案内】
+・予約方法は「お電話」または「公式LINE」のみです（オンライン予約サイトは現在ございません）
+・お電話の場合：0282-51-1879 へご案内する
+・LINEの場合：以下のリンクを案内する
+  [公式LINEはこちら♪](https://line.me/R/ti/p/@dle3534c)
+・当日予約は要電話確認、飛び込み（予約なし）でのご来店は不可
+・キャンセル料は特にない旨を伝える
+・遅刻の場合、予約時間から15分過ぎまでは対応可能と案内する
+・自然な流れで来店を後押しする
+
+【よくある質問（FAQ）】
+Q. 縮毛矯正とブリーチは一緒にできますか？
+A. 髪の負担が大きいため、申し訳ございませんが両方同時の施術はお断りしております。
+
+Q. ヘアカラーとパーマは一緒にできますか？
+A. 毛髪診断をした上で可能と判断した場合は承っております。まずはカウンセリングを受けていただくようご案内する。
+
+Q. ブリーチをすると髪は傷みますか？
+A. 髪への負担は大きいこと、当店では2種類の薬剤をご用意し、できるだけ痛みの少ない施術を心がけていることを伝える。ただし通常のファッションカラーより負荷がかかる旨は正直に伝える。
+
+Q. 縮毛矯正をしたいのですが、髪は痛みますか？
+A. 痛みを最小限に抑える施術を行っていること、ただし過去の縮毛矯正歴によって髪の状態は変わること、施術後はトリートメントとセットでの利用をおすすめすることを伝える。
+
+【クレーム・苦情への対応】
+・お客様のお気持ちに寄り添いつつ、詳細な対応が必要な内容は「スタッフに直接お繋ぎしますね」と伝え、電話（0282-51-1879）またはLINEでの直接連絡を案内する。ボット自身で解決を断定しない。
+
+【値引き・交渉への対応】
+・「大変恐れ入りますが、料金についてはメニュー表の価格にてご案内しております」といった定型文でやんわりお断りする。
+
+【他店・競合との比較質問への対応】
+・「申し訳ございませんが、他店様との比較についてはお答えいたしかねます」とやんわりお断りする。
+
+【重要な制約】
+- 医療的な断定・保証はしない（「必ず治る」「絶対に痛くない」等の断定表現は避ける）
+- 個人情報（お客様の氏名・連絡先など）に関する質問には答えない
+- 薬機法に配慮し、効果効能を保証するような表現は使わない
+- ゲストの気持ちを最優先にする`;
+
+    /* ========================= クイック質問 ========================= */
+    const QUICK_QUESTIONS = [
+      "営業時間を教えてください",
+      "定休日はいつですか？",
+      "駐車場はありますか？",
+      "予約方法を教えてください",
+      "当日予約はできますか？",
+      "予約なしでも行けますか？",
+      "カットの料金を教えてください",
+      "パーマの料金と時間を教えてください",
+      "ブリーチは髪が傷みますか？",
+      "縮毛矯正とブリーチは一緒にできますか？",
+      "カラーとパーマは同時にできますか？",
+      "キャンセル料はかかりますか？",
+      "遅刻しそうです、大丈夫ですか？",
+      "子供と一緒に行けますか？",
+      "指名はできますか？",
+    ];
+
+    /* ========================= 配色（親しみやすい・あたたかい暖色系） ========================= */
+    const COLORS = {
+      gradientStart: "#fff3ea",
+      gradientEnd: "#ffd9c2",
+      headerGradient: "linear-gradient(135deg, #ff9e6d 0%, #ff7a59 100%)",
+      accent: "#ff7a59",
+      accentSoft: "#ffe4d6",
+      bg: "#fffaf6",
+      textDark: "#2c1c14",
+    };
+
+    const MAX_TURNS = 12;
+
+    /* ========================= Markdownリンクの簡易パーサー ========================= */
+    function renderWithLinks(text) {
+      const parts = [];
+      let lastIndex = 0;
+      const regex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+      let match;
+      let key = 0;
+      while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+          parts.push(text.slice(lastIndex, match.index));
+        }
+        parts.push(
+          <a
+            key={"link-" + key++}
+            href={match[2]}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: COLORS.accent, fontWeight: "600", textDecoration: "underline" }}
+          >
+            {match[1]}
+          </a>
+        );
+        lastIndex = regex.lastIndex;
+      }
+      if (lastIndex < text.length) {
+        parts.push(text.slice(lastIndex));
+      }
+      return parts;
+    }
+
+    /* ========================= スタイル ========================= */
+    const styles = {
+      wrapper: {
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        background: `linear-gradient(160deg, ${COLORS.gradientStart} 0%, ${COLORS.gradientEnd} 100%)`,
+        fontFamily: "'Noto Sans JP', sans-serif",
+        padding: "16px",
+        boxSizing: "border-box",
+      },
+      container: {
+        width: "100%",
+        maxWidth: "440px",
+        height: "min(92vh, 760px)",
+        background: COLORS.bg,
+        borderRadius: "24px",
+        boxShadow: "0 8px 40px rgba(160,90,60,0.18)",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      },
+      header: {
+        background: COLORS.headerGradient,
+        color: "#fff",
+        padding: "18px 20px",
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+      },
+      headerTitle: {
+        fontSize: "16px",
+        fontWeight: "700",
+        margin: 0,
+      },
+      headerSubtitle: {
+        fontSize: "12px",
+        opacity: 0.9,
+        margin: 0,
+      },
+      messagesArea: {
+        flex: 1,
+        overflowY: "auto",
+        padding: "16px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "10px",
+      },
+      bubbleRow: (isUser) => ({
+        display: "flex",
+        justifyContent: isUser ? "flex-end" : "flex-start",
+      }),
+      botBubble: {
+        background: "#ffffff",
+        border: `1px solid ${COLORS.accentSoft}`,
+        borderRadius: "16px 16px 16px 4px",
+        padding: "10px 14px",
+        maxWidth: "80%",
+      },
+      userBubble: {
+        background: COLORS.accent,
+        borderRadius: "16px 16px 4px 16px",
+        padding: "10px 14px",
+        maxWidth: "80%",
+      },
+      botBubbleText: {
+        fontSize: "14px",
+        lineHeight: "1.8",
+        color: COLORS.textDark,
+        fontWeight: "400",
+        margin: 0,
+        whiteSpace: "pre-wrap",
+      },
+      userBubbleText: {
+        fontSize: "14px",
+        lineHeight: "1.8",
+        color: "#fff",
+        fontWeight: "400",
+        margin: 0,
+        whiteSpace: "pre-wrap",
+      },
+      quickWrap: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "6px",
+        padding: "0 16px 10px 16px",
+      },
+      quickBtn: {
+        fontSize: "12px",
+        border: `1px solid ${COLORS.accent}`,
+        color: COLORS.accent,
+        background: "#fff",
+        borderRadius: "999px",
+        padding: "6px 12px",
+        cursor: "pointer",
+      },
+      inputArea: {
+        display: "flex",
+        gap: "8px",
+        padding: "12px 16px",
+        borderTop: `1px solid ${COLORS.accentSoft}`,
+        background: "#fff",
+      },
+      input: {
+        flex: 1,
+        border: `1px solid ${COLORS.accentSoft}`,
+        borderRadius: "999px",
+        padding: "10px 16px",
+        fontSize: "14px",
+        outline: "none",
+        fontFamily: "'Noto Sans JP', sans-serif",
+      },
+      sendBtn: {
+        background: COLORS.accent,
+        color: "#fff",
+        border: "none",
+        borderRadius: "999px",
+        padding: "0 18px",
+        fontSize: "14px",
+        fontWeight: "600",
+        cursor: "pointer",
+      },
+      formWrapper: {
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        height: "100%",
+        padding: "32px 24px",
+        textAlign: "center",
+        boxSizing: "border-box",
+      },
+      formTitle: {
+        fontSize: "20px",
+        fontWeight: "700",
+        color: COLORS.textDark,
+        marginBottom: "8px",
+      },
+      formSubtitle: {
+        fontSize: "13px",
+        color: "#7a6a60",
+        marginBottom: "24px",
+        lineHeight: "1.7",
+      },
+      formInput: {
+        width: "100%",
+        border: `1px solid ${COLORS.accentSoft}`,
+        borderRadius: "12px",
+        padding: "12px 16px",
+        fontSize: "14px",
+        marginBottom: "16px",
+        outline: "none",
+        boxSizing: "border-box",
+        fontFamily: "'Noto Sans JP', sans-serif",
+      },
+      formBtn: {
+        width: "100%",
+        background: COLORS.headerGradient,
+        color: "#fff",
+        border: "none",
+        borderRadius: "12px",
+        padding: "14px",
+        fontSize: "15px",
+        fontWeight: "700",
+        cursor: "pointer",
+      },
+      typingDots: {
+        fontSize: "14px",
+        color: "#a08c80",
+      },
+    };
+
+    /* ========================= 営業時間外判定 ========================= */
+    function isWithinBusinessHours() {
+      const now = new Date();
+      const day = now.getDay(); // 0=日 ... 2=火
+      const hour = now.getHours() + now.getMinutes() / 60;
+      if (day === 2) return false; // 火曜定休（第3月曜は簡易判定のため除外）
+      return hour >= 9 && hour < 18.5;
+    }
+
+    /* ========================= 名前入力フォーム ========================= */
+    function NameForm({ nameInput, setNameInput, handleStart }) {
+      return (
+        <div style={styles.formWrapper}>
+          <div style={{ fontSize: "40px", marginBottom: "12px" }}>💇‍♀️✨</div>
+          <div style={styles.formTitle}>美容室レプレ</div>
+          <div style={styles.formSubtitle}>
+            ご来店前のご相談やご予約について、{"\n"}
+            お気軽にチャットでお問い合わせください😊
+          </div>
+          <input
+            style={styles.formInput}
+            type="text"
+            placeholder="お名前（未入力でもOKです）"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleStart();
+            }}
+          />
+          <button style={styles.formBtn} onClick={handleStart}>
+            相談をはじめる
+          </button>
+        </div>
+      );
+    }
+
+    /* ========================= チャット画面 ========================= */
+    function ChatView({ messages, input, setInput, sendMessage, isLoading, messagesEndRef, showQuick }) {
+      return (
+        <React.Fragment>
+          <div style={styles.header}>
+            <div style={{ fontSize: "26px" }}>💇‍♀️</div>
+            <div>
+              <p style={styles.headerTitle}>美容室レプレ</p>
+              <p style={styles.headerSubtitle}>スタッフがお答えします</p>
+            </div>
+          </div>
+
+          <div style={styles.messagesArea}>
+            {messages.map((m, i) => (
+              <div key={i} style={styles.bubbleRow(m.role === "user")}>
+                <div style={m.role === "user" ? styles.userBubble : styles.botBubble}>
+                  <p style={m.role === "user" ? styles.userBubbleText : styles.botBubbleText}>
+                    {m.role === "user" ? m.content : renderWithLinks(m.content)}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {isLoading && (
+              <div style={styles.bubbleRow(false)}>
+                <div style={styles.botBubble}>
+                  <p style={styles.typingDots}>入力中…</p>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {showQuick && (
+            <div style={styles.quickWrap}>
+              {QUICK_QUESTIONS.slice(0, 6).map((q, i) => (
+                <button key={i} style={styles.quickBtn} onClick={() => sendMessage(q)}>
+                  {q}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div style={styles.inputArea}>
+            <input
+              style={styles.input}
+              type="text"
+              placeholder="メッセージを入力…"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && input.trim()) sendMessage(input);
+              }}
+            />
+            <button
+              style={styles.sendBtn}
+              onClick={() => input.trim() && sendMessage(input)}
+              disabled={isLoading}
+            >
+              送信
+            </button>
+          </div>
+        </React.Fragment>
+      );
+    }
+
+    /* ========================= メインアプリ ========================= */
+    function ChatbotApp() {
+      const [guestName, setGuestName] = useState("");
+      const [nameInput, setNameInput] = useState("");
+      const [showForm, setShowForm] = useState(true);
+      const [messages, setMessages] = useState([]);
+      const [input, setInput] = useState("");
+      const [isLoading, setIsLoading] = useState(false);
+      const [turnCount, setTurnCount] = useState(0);
+      const messagesEndRef = useRef(null);
+
+      useEffect(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+      }, [messages, isLoading]);
+
+      const handleStart = () => {
+        const name = nameInput.trim();
+        setGuestName(name);
+        const withinHours = isWithinBusinessHours();
+        const greeting = withinHours
+          ? (name
+              ? `${name}様、はじめまして😊✨\n美容室レプレです！\nご予約前のご相談など、お気軽にお聞かせくださいね🙌`
+              : `はじめまして😊✨\n美容室レプレです！\nご予約前のご相談など、お気軽にお聞かせくださいね🙌`)
+          : SALON.offHoursMessage;
+        setMessages([{ role: "assistant", content: greeting }]);
+        setShowForm(false);
+      };
+
+      const sendMessage = async (text) => {
+        if (!text.trim() || isLoading) return;
+        const newMessages = [...messages, { role: "user", content: text }];
+        setMessages(newMessages);
+        setInput("");
+
+        if (turnCount >= MAX_TURNS) {
+          setMessages([
+            ...newMessages,
+            {
+              role: "assistant",
+              content:
+                "たくさんご相談いただきありがとうございます😊\nより詳しいご案内はお電話（0282-51-1879）または公式LINEにて、スタッフが直接対応させていただきますね。",
+            },
+          ]);
+          return;
+        }
+
+        setIsLoading(true);
+        setTurnCount((c) => c + 1);
+
+        try {
+          const response = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "claude-sonnet-4-5-20250929",
+              max_tokens: 500,
+              system: SYSTEM_PROMPT,
+              messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
+            }),
+          });
+          const data = await response.json();
+          const replyText =
+            data && data.content && data.content[0] && data.content[0].text
+              ? data.content[0].text
+              : "申し訳ございません、うまくお答えできませんでした。お電話（0282-51-1879）にてお問い合わせくださいませ🙏";
+          setMessages((prev) => [...prev, { role: "assistant", content: replyText }]);
+        } catch (error) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content:
+                "申し訳ございません、只今接続がうまくいかないようです🙏\nお手数ですがお電話（0282-51-1879）にてお問い合わせください。",
+            },
+          ]);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      return (
+        <div style={styles.wrapper}>
+          <div style={styles.container}>
+            {showForm ? (
+              <NameForm nameInput={nameInput} setNameInput={setNameInput} handleStart={handleStart} />
+            ) : (
+              <ChatView
+                messages={messages}
+                input={input}
+                setInput={setInput}
+                sendMessage={sendMessage}
+                isLoading={isLoading}
+                messagesEndRef={messagesEndRef}
+                showQuick={messages.length <= 1}
+              />
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<ChatbotApp />);
+  </script>
+</body>
+</html>
