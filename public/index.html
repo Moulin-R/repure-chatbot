@@ -511,7 +511,7 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              model: "claude-sonnet-4-5-20250929",
+              model: "claude-haiku-4-5-20251001 ",
               max_tokens: 500,
               system: SYSTEM_PROMPT,
               messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
