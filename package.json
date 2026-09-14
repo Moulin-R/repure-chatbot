@@ -1,0 +1,1 @@
+{"private":true,"type":"module","scripts":{"test":"node --test","check:notion":"node check-notion.mjs"}}
