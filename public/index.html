@@ -17,6 +17,17 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"
     onload="window.Babel.registerPreset('custom-react-classic',{presets:[[window.Babel.availablePresets['react'],{runtime:'classic'}]]})">
   </script>
+
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+  </style>
 </head>
 <body style="margin:0;padding:0;">
   <div id="root"></div>
@@ -184,7 +195,10 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
     /* ========================= スタイル ========================= */
     const styles = {
       wrapper: {
-        minHeight: "100dvh",
+        width: "100%",
+        maxWidth: "100%",
+        minHeight: "calc(var(--vh, 1vh) * 100)",
+        overflowX: "hidden",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
@@ -197,7 +211,7 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
       container: {
         width: "100%",
         maxWidth: "440px",
-        height: "min(90dvh, 760px)",
+        height: "min(calc(var(--vh, 1vh) * 90), 760px)",
         background: COLORS.bg,
         borderRadius: "24px",
         boxShadow: "0 8px 40px rgba(160,90,60,0.18)",
@@ -473,6 +487,26 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
       const [isLoading, setIsLoading] = useState(false);
       const [turnCount, setTurnCount] = useState(0);
       const messagesEndRef = useRef(null);
+
+      useEffect(() => {
+        const setViewportHeight = () => {
+          const h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+          document.documentElement.style.setProperty("--vh", `${h * 0.01}px`);
+        };
+        setViewportHeight();
+        window.addEventListener("resize", setViewportHeight);
+        window.addEventListener("orientationchange", setViewportHeight);
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener("resize", setViewportHeight);
+        }
+        return () => {
+          window.removeEventListener("resize", setViewportHeight);
+          window.removeEventListener("orientationchange", setViewportHeight);
+          if (window.visualViewport) {
+            window.visualViewport.removeEventListener("resize", setViewportHeight);
+          }
+        };
+      }, []);
 
       useEffect(() => {
         if (messagesEndRef.current) {
