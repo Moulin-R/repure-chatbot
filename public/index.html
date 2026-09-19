@@ -184,19 +184,20 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
     /* ========================= スタイル ========================= */
     const styles = {
       wrapper: {
-        minHeight: "100vh",
+        minHeight: "100dvh",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
         background: `linear-gradient(160deg, ${COLORS.gradientStart} 0%, ${COLORS.gradientEnd} 100%)`,
         fontFamily: "'Noto Sans JP', sans-serif",
         padding: "16px",
+        paddingBottom: "max(16px, env(safe-area-inset-bottom))",
         boxSizing: "border-box",
       },
       container: {
         width: "100%",
         maxWidth: "440px",
-        height: "min(92vh, 760px)",
+        height: "min(90dvh, 760px)",
         background: COLORS.bg,
         borderRadius: "24px",
         boxShadow: "0 8px 40px rgba(160,90,60,0.18)",
@@ -268,6 +269,9 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
         flexWrap: "wrap",
         gap: "6px",
         padding: "0 16px 10px 16px",
+        flexShrink: 0,
+        maxHeight: "35%",
+        overflowY: "auto",
       },
       quickBtn: {
         fontSize: "12px",
@@ -282,8 +286,10 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
         display: "flex",
         gap: "8px",
         padding: "12px 16px",
+        paddingBottom: "max(12px, env(safe-area-inset-bottom))",
         borderTop: `1px solid ${COLORS.accentSoft}`,
         background: "#fff",
+        flexShrink: 0,
       },
       input: {
         flex: 1,
@@ -303,6 +309,8 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
         fontSize: "14px",
         fontWeight: "600",
         cursor: "pointer",
+        whiteSpace: "nowrap",
+        flexShrink: 0,
       },
       formWrapper: {
         display: "flex",
@@ -550,7 +558,7 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
                 sendMessage={sendMessage}
                 isLoading={isLoading}
                 messagesEndRef={messagesEndRef}
-                showQuick={messages.length <= 1}
+                showQuick={true}
               />
             )}
           </div>
