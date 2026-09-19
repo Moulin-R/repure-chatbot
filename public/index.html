@@ -28,8 +28,17 @@
       overflow-x: hidden;
     }
   </style>
+<style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+  </style>
 </head>
-<body style="margin:0;padding:0;">
+<body>
   <div id="root"></div>
   <script type="text/babel" data-presets="custom-react-classic">
     const { useState, useRef, useEffect } = React;
@@ -197,7 +206,11 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
       wrapper: {
         width: "100%",
         maxWidth: "100%",
-        minHeight: "calc(var(--vh, 1vh) * 100)",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        height: "calc(var(--vh, 1vh) * 100)",
         overflowX: "hidden",
         display: "flex",
         justifyContent: "center",
