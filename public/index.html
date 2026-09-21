@@ -507,6 +507,7 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
       const [turnCount, setTurnCount] = useState(0);
       const [askedQuestions, setAskedQuestions] = useState(() => new Set());
       const messagesEndRef = useRef(null);
+      const sessionIdRef = useRef(crypto.randomUUID());
 
       const visibleQuickQuestions = QUICK_QUESTIONS.filter(
         (q) => !askedQuestions.has(q)
@@ -597,6 +598,17 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
               ? data.content[0].text
               : "申し訳ございません、うまくお答えできませんでした。お電話（0282-51-1879）にてお問い合わせくださいませ🙏";
           setMessages((prev) => [...prev, { role: "assistant", content: replyText }]);
+
+          // Notionへの相談ログ自動保存（送りっぱなし。失敗してもチャット表示には影響しない）
+          fetch("/api/log", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionId: sessionIdRef.current,
+              userMessage: text,
+              assistantMessage: replyText,
+            }),
+          }).catch(() => {});
         } catch (error) {
           setMessages((prev) => [
             ...prev,
