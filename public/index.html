@@ -156,6 +156,11 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
       "遅刻しそうです、大丈夫ですか？",
       "子供と一緒に行けますか？",
       "指名はできますか？",
+      "指名料はかかりますか？",
+      "白髪染めもできますか？",
+      "初めてなのですが予約できますか？",
+      "英語が話せるスタッフはいますか？",
+      "車いすでも利用できますか？",
     ];
 
     /* ========================= 配色（親しみやすい・あたたかい暖色系） ========================= */
@@ -427,7 +432,7 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
     }
 
     /* ========================= チャット画面 ========================= */
-    function ChatView({ messages, input, setInput, sendMessage, isLoading, messagesEndRef, showQuick }) {
+    function ChatView({ messages, input, setInput, sendMessage, isLoading, messagesEndRef, showQuick, quickQuestions }) {
       return (
         <React.Fragment>
           <div style={styles.header}>
@@ -458,10 +463,10 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
             <div ref={messagesEndRef} />
           </div>
 
-          {showQuick && (
+          {showQuick && quickQuestions.length > 0 && (
             <div style={styles.quickWrap}>
-              {QUICK_QUESTIONS.slice(0, 6).map((q, i) => (
-                <button key={i} style={styles.quickBtn} onClick={() => sendMessage(q)}>
+              {quickQuestions.map((q, i) => (
+                <button key={q} style={styles.quickBtn} onClick={() => sendMessage(q)}>
                   {q}
                 </button>
               ))}
@@ -500,7 +505,12 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
       const [input, setInput] = useState("");
       const [isLoading, setIsLoading] = useState(false);
       const [turnCount, setTurnCount] = useState(0);
+      const [askedQuestions, setAskedQuestions] = useState(() => new Set());
       const messagesEndRef = useRef(null);
+
+      const visibleQuickQuestions = QUICK_QUESTIONS.filter(
+        (q) => !askedQuestions.has(q)
+      ).slice(0, 6);
 
       useEffect(() => {
         const setViewportHeight = () => {
@@ -546,6 +556,14 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
         const newMessages = [...messages, { role: "user", content: text }];
         setMessages(newMessages);
         setInput("");
+
+        if (QUICK_QUESTIONS.includes(text)) {
+          setAskedQuestions((prev) => {
+            const next = new Set(prev);
+            next.add(text);
+            return next;
+          });
+        }
 
         if (turnCount >= MAX_TURNS) {
           setMessages([
@@ -607,6 +625,7 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
                 isLoading={isLoading}
                 messagesEndRef={messagesEndRef}
                 showQuick={true}
+                quickQuestions={visibleQuickQuestions}
               />
             )}
           </div>
