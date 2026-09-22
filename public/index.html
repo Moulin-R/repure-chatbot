@@ -25,13 +25,6 @@
       padding: 0;
       width: 100%;
       max-width: 100%;
-      overflow-x: hidden;
-    }
-  </style>
-<style>
-    html, body {
-      margin: 0;
-      padding: 0;
       height: 100%;
       overflow: hidden;
       overscroll-behavior: none;
@@ -432,7 +425,7 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
     }
 
     /* ========================= チャット画面 ========================= */
-    function ChatView({ messages, input, setInput, sendMessage, isLoading, messagesEndRef, showQuick, quickQuestions }) {
+    function ChatView({ messages, input, setInput, sendMessage, isLoading, messagesEndRef, lastMessageRef, showQuick, quickQuestions }) {
       return (
         <React.Fragment>
           <div style={styles.header}>
@@ -445,7 +438,11 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
 
           <div style={styles.messagesArea}>
             {messages.map((m, i) => (
-              <div key={i} style={styles.bubbleRow(m.role === "user")}>
+              <div
+                key={i}
+                ref={i === messages.length - 1 ? lastMessageRef : null}
+                style={styles.bubbleRow(m.role === "user")}
+              >
                 <div style={m.role === "user" ? styles.userBubble : styles.botBubble}>
                   <p style={m.role === "user" ? styles.userBubbleText : styles.botBubbleText}>
                     {m.role === "user" ? m.content : renderWithLinks(m.content)}
@@ -507,6 +504,7 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
       const [turnCount, setTurnCount] = useState(0);
       const [askedQuestions, setAskedQuestions] = useState(() => new Set());
       const messagesEndRef = useRef(null);
+      const lastMessageRef = useRef(null);
       const sessionIdRef = useRef(crypto.randomUUID());
 
       const visibleQuickQuestions = QUICK_QUESTIONS.filter(
@@ -534,8 +532,12 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
       }, []);
 
       useEffect(() => {
-        if (messagesEndRef.current) {
-          messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        if (isLoading) {
+          if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+          }
+        } else if (lastMessageRef.current) {
+          lastMessageRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
         }
       }, [messages, isLoading]);
 
@@ -636,6 +638,7 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
                 sendMessage={sendMessage}
                 isLoading={isLoading}
                 messagesEndRef={messagesEndRef}
+                lastMessageRef={lastMessageRef}
                 showQuick={true}
                 quickQuestions={visibleQuickQuestions}
               />
