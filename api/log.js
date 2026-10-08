@@ -2,10 +2,10 @@
 //
 // 書き込み先は2つ、それぞれ列の構成が違う点に注意:
 //
-//  ① 本部の「Rena管理用データベース」(14項目・複数サロンをまとめて管理する用)
+//  ① 本部の「Rena管理用データベース」(15項目・複数サロンをまとめて管理する用)
 //     相談タイトル(title) / 店舗名 / 相談日時 / 相談カテゴリー /
 //     お客様の悩み / お客様の要望 / 相談内容 / AI回答 / 要約 /
-//     対応状況 / 経営改善のヒント / 資料・発信への活用案 / スタッフの気づき / セッションID
+//     対応状況 / 経営改善のヒント / 資料・発信への活用案 / スタッフの気づき / セッションID / 年代
 //
 //  ② レブレさんの「Rena相談記録」(マニュアル通りの11項目・レブレさん単独用)
 //     相談の要約(title) / 相談日時 / お客様の質問 / Renaの回答 / 相談カテゴリー /
@@ -20,6 +20,12 @@
 //   SALON_NAME                  - このチャットbotがどのサロン用かを表す文字列（未設定なら"レブレ"）
 //
 // 片方の環境変数が未設定・書き込み失敗でも、もう片方の保存は独立して継続する。
+//
+// 【Ver.5の変更点】
+//  ・チャット画面で選ばれた「年代」(任意)を、本部DBの「年代」列にだけ記録する。
+//  ・年代が未選択、または想定外の値のときは、「年代」列を送らない(空欄のまま保存)。
+//  ・万一「年代」列が原因で本部への保存が失敗した場合は、年代なしでもう一度保存する
+//    (年代の不具合で、相談ログそのものが消えないようにするため)。
 
 const NOTION_VERSION = "2022-06-28";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -33,6 +39,9 @@ const CATEGORY_OPTIONS = [
   "商品・店販",
   "その他",
 ];
+
+// Notionの「年代」列の選択肢、およびチャット画面のチップと完全に一致させること
+const AGE_OPTIONS = ["10代", "20代", "30代", "40代", "50代", "60代以上"];
 
 function chunkText(text, size = 1900) {
   const str = String(text ?? "");
@@ -145,9 +154,9 @@ async function createNotionPage(apiKey, databaseId, properties) {
   }
 }
 
-// ---- ① 本部「Rena管理用データベース」向け(14項目・店舗名あり) ----
-function buildHqProperties({ salonName, sessionId, userMessage, assistantMessage, insights }) {
-  return {
+// ---- ① 本部「Rena管理用データベース」向け(15項目・店舗名と年代あり) ----
+function buildHqProperties({ salonName, sessionId, userMessage, assistantMessage, insights, ageGroup }) {
+  const properties = {
     相談タイトル: { title: [{ type: "text", text: { content: insights.title || "ご相談" } }] },
     店舗名: { rich_text: toRichText(salonName) },
     相談日時: { date: { start: new Date().toISOString() } },
@@ -163,6 +172,9 @@ function buildHqProperties({ salonName, sessionId, userMessage, assistantMessage
     // スタッフの気づき は空欄のまま(スタッフが手入力する欄)
     セッションID: { rich_text: toRichText(sessionId) },
   };
+  // 年代は任意。選ばれたときだけ送る(未選択は空欄=「未回答」として集計される)
+  if (ageGroup) properties["年代"] = { select: { name: ageGroup } };
+  return properties;
 }
 
 // ---- ② レブレさん「Rena相談記録」向け(マニュアル通り11項目・店舗名なし) ----
@@ -191,21 +203,26 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { sessionId, userMessage, assistantMessage } = req.body || {};
+  const { sessionId, userMessage, assistantMessage, ageGroup: rawAgeGroup } = req.body || {};
   if (!sessionId || !userMessage || !assistantMessage) {
     return res.status(400).json({ error: "sessionId, userMessage, assistantMessage は必須です" });
   }
+
+  // 想定外の値は無視する(Notionの選択肢に勝手な値が増えるのを防ぐ)
+  const ageGroup = AGE_OPTIONS.includes(rawAgeGroup) ? rawAgeGroup : "";
 
   const salonName = process.env.SALON_NAME || "レブレ";
 
   // AI項目は1回だけ生成し、本部・レブレ両方の書き込みで使い回す
   const insights = await generateInsights(userMessage, assistantMessage);
 
-  const [hqResult, salonResult] = await Promise.all([
+  const hqArgs = { salonName, sessionId, userMessage, assistantMessage, insights };
+
+  const [hqFirst, salonResult] = await Promise.all([
     createNotionPage(
       process.env.NOTION_API_KEY,
       process.env.NOTION_DATABASE_ID,
-      buildHqProperties({ salonName, sessionId, userMessage, assistantMessage, insights })
+      buildHqProperties({ ...hqArgs, ageGroup })
     ),
     createNotionPage(
       process.env.NOTION_API_KEY_PARTNER,
@@ -213,6 +230,17 @@ module.exports = async function handler(req, res) {
       buildSalonProperties({ sessionId, userMessage, assistantMessage, insights })
     ),
   ]);
+
+  // 「年代」列が原因で本部への保存だけ失敗した場合は、年代なしでもう一度保存する
+  let hqResult = hqFirst;
+  if (!hqFirst.ok && hqFirst.reason === "notion_error" && ageGroup) {
+    console.error("HQ write failed with ageGroup; retrying without it");
+    hqResult = await createNotionPage(
+      process.env.NOTION_API_KEY,
+      process.env.NOTION_DATABASE_ID,
+      buildHqProperties({ ...hqArgs, ageGroup: "" })
+    );
+  }
 
   // ロギングの失敗でチャットUIを止めないよう、常に200を返す
   return res.status(200).json({
