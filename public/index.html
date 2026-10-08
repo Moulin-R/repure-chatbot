@@ -169,6 +169,9 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
 
     const MAX_TURNS = 12;
 
+    /* ========================= 年代の選択肢（Notion「年代」列の選択肢と完全一致させること） ========================= */
+    const AGE_GROUPS = ["10代", "20代", "30代", "40代", "50代", "60代以上"];
+
     /* ========================= Markdownリンクの簡易パーサー ========================= */
     function renderWithLinks(text) {
       const parts = [];
@@ -341,12 +344,20 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
       formWrapper: {
         display: "flex",
         flexDirection: "column",
-        justifyContent: "center",
         alignItems: "center",
         height: "100%",
-        padding: "32px 24px",
+        padding: "24px",
         textAlign: "center",
         boxSizing: "border-box",
+        overflowY: "auto",
+      },
+      // margin: auto 0 で「余裕があれば縦中央、足りなければ上から並べてスクロール」になる
+      formInner: {
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        width: "100%",
+        margin: "auto 0",
       },
       formTitle: {
         fontSize: "20px",
@@ -370,6 +381,42 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
         outline: "none",
         boxSizing: "border-box",
         fontFamily: "'Noto Sans JP', sans-serif",
+      },
+      ageLabel: {
+        width: "100%",
+        textAlign: "left",
+        fontSize: "12px",
+        fontWeight: "500",
+        color: "#7a6a60",
+        marginBottom: "8px",
+      },
+      ageGrid: {
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)",
+        gap: "8px",
+        width: "100%",
+      },
+      ageChip: (selected) => ({
+        minWidth: 0,
+        minHeight: "40px",
+        padding: "8px 0",
+        fontSize: "14px",
+        fontWeight: selected ? "700" : "500",
+        fontFamily: "'Noto Sans JP', sans-serif",
+        border: `1px solid ${COLORS.accent}`,
+        borderRadius: "999px",
+        background: selected ? COLORS.accent : "#fff",
+        color: selected ? "#fff" : COLORS.accent,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+      }),
+      ageHint: {
+        width: "100%",
+        textAlign: "left",
+        fontSize: "11px",
+        color: "#a08c80",
+        marginTop: "8px",
+        marginBottom: "16px",
       },
       formBtn: {
         width: "100%",
@@ -398,28 +445,45 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
     }
 
     /* ========================= 名前入力フォーム ========================= */
-    function NameForm({ nameInput, setNameInput, handleStart }) {
+    function NameForm({ nameInput, setNameInput, ageGroup, setAgeGroup, handleStart }) {
       return (
         <div style={styles.formWrapper}>
-          <div style={{ fontSize: "40px", marginBottom: "12px" }}>💇‍♀️✨</div>
-          <div style={styles.formTitle}>美容室レプレ</div>
-          <div style={styles.formSubtitle}>
-            ご来店前のご相談やご予約について、{"\n"}
-            お気軽にチャットでお問い合わせください😊
+          <div style={styles.formInner}>
+            <div style={{ fontSize: "40px", marginBottom: "12px" }}>💇‍♀️✨</div>
+            <div style={styles.formTitle}>美容室レプレ</div>
+            <div style={styles.formSubtitle}>
+              ご来店前のご相談やご予約について、{"\n"}
+              お気軽にチャットでお問い合わせください😊
+            </div>
+            <input
+              style={styles.formInput}
+              type="text"
+              placeholder="お名前（未入力でもOKです）"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleStart();
+              }}
+            />
+            <div style={styles.ageLabel}>年代（任意）</div>
+            <div style={styles.ageGrid}>
+              {AGE_GROUPS.map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  style={styles.ageChip(ageGroup === a)}
+                  aria-pressed={ageGroup === a}
+                  onClick={() => setAgeGroup(ageGroup === a ? "" : a)}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+            <div style={styles.ageHint}>接客の参考にします。選ばなくてもOKです</div>
+            <button style={styles.formBtn} onClick={handleStart}>
+              相談をはじめる
+            </button>
           </div>
-          <input
-            style={styles.formInput}
-            type="text"
-            placeholder="お名前（未入力でもOKです）"
-            value={nameInput}
-            onChange={(e) => setNameInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleStart();
-            }}
-          />
-          <button style={styles.formBtn} onClick={handleStart}>
-            相談をはじめる
-          </button>
         </div>
       );
     }
@@ -497,6 +561,7 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
     function ChatbotApp() {
       const [guestName, setGuestName] = useState("");
       const [nameInput, setNameInput] = useState("");
+      const [ageGroup, setAgeGroup] = useState(""); // 任意。未選択は空文字
       const [showForm, setShowForm] = useState(true);
       const [messages, setMessages] = useState([]);
       const [input, setInput] = useState("");
@@ -609,6 +674,7 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
               sessionId: sessionIdRef.current,
               userMessage: text,
               assistantMessage: replyText,
+              ageGroup: ageGroup || undefined, // 未選択なら送信しない（JSON化で省かれる）
             }),
           }).catch(() => {});
         } catch (error) {
@@ -629,7 +695,13 @@ A. 痛みを最小限に抑える施術を行っていること、ただし過�
         <div style={styles.wrapper}>
           <div style={styles.container}>
             {showForm ? (
-              <NameForm nameInput={nameInput} setNameInput={setNameInput} handleStart={handleStart} />
+              <NameForm
+                nameInput={nameInput}
+                setNameInput={setNameInput}
+                ageGroup={ageGroup}
+                setAgeGroup={setAgeGroup}
+                handleStart={handleStart}
+              />
             ) : (
               <ChatView
                 messages={messages}
