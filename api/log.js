@@ -21,6 +21,10 @@
 //
 // 片方の環境変数が未設定・書き込み失敗でも、もう片方の保存は独立して継続する。
 //
+// 【Ver.6の変更点】
+//  ・AI生成に使うモデルを claude-haiku-5-5 に変更(コスト削減)。思考の深さは effort: "low" に固定し、
+//    最大トークン数を600→1500に増やした(思考の分も数えられるため)。
+//
 // 【Ver.5の変更点】
 //  ・チャット画面で選ばれた「年代」(任意)を、本部DBの「年代」列にだけ記録する。
 //  ・年代が未選択、または想定外の値のときは、「年代」列を送らない(空欄のまま保存)。
@@ -29,7 +33,7 @@
 
 const NOTION_VERSION = "2022-06-28";
 const ANTHROPIC_VERSION = "2023-06-01";
-const ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"; // 短い分類・要約タスクなので高速・低コストなHaikuを使用
+const ANTHROPIC_MODEL = "claude-haiku-5-5"; // 短い分類・要約タスクなので高速・低コストなHaikuを使用(Ver.6でHaiku 5.5へ)
 
 const CATEGORY_OPTIONS = [
   "ヘアケア・髪の悩み",
@@ -95,7 +99,8 @@ ${assistantMessage}
       },
       body: JSON.stringify({
         model: ANTHROPIC_MODEL,
-        max_tokens: 600,
+        max_tokens: 1500, // Haiku 5.5は思考の分もここに含まれ、同じ文章でもトークン数が約3割増えるため余裕を持たせる
+        output_config: { effort: "low" }, // 分類・要約は軽い思考で十分
         messages: [{ role: "user", content: prompt }],
       }),
     });
