@@ -2,8 +2,8 @@
 //
 // 書き込み先は2つ、それぞれ列の構成が違う点に注意:
 //
-//  ① 本部の「Rena管理用データベース」(15項目・複数サロンをまとめて管理する用)
-//     相談タイトル(title) / 店舗名 / 相談日時 / 相談カテゴリー /
+//  ① 本部の「Rena管理用データベース」(複数サロンをまとめて管理する用)
+//     相談タイトル(title) / ご利用者の名前 / 店舗名 / 相談日時 / 相談カテゴリー /
 //     お客様の悩み / お客様の要望 / 相談内容 / AI回答 / 要約 /
 //     対応状況 / 経営改善のヒント / 資料・発信への活用案 / スタッフの気づき / セッションID / 年代
 //
@@ -21,6 +21,13 @@
 //
 // 片方の環境変数が未設定・書き込み失敗でも、もう片方の保存は独立して継続する。
 //
+// 【Ver.7の変更点】
+//  ・チャット画面で入力された「お名前」(任意)を、本部DBの「ご利用者の名前」列にだけ記録する。
+//    (レブレさんの「Rena相談記録」には名前の列がないので送らない)
+//  ・名前が未入力のときは「ゲスト」と記録する。
+//  ・万一「年代」「ご利用者の名前」列が原因で本部への保存が失敗した場合は、
+//    その2つを外してもう一度保存する(相談ログそのものが消えないようにするため)。
+//
 // 【Ver.6の変更点】
 //  ・AI生成に使うモデルを claude-haiku-5-5 に変更(コスト削減)。思考の深さは effort: "low" に固定し、
 //    最大トークン数を600→1500に増やした(思考の分も数えられるため)。
@@ -28,8 +35,6 @@
 // 【Ver.5の変更点】
 //  ・チャット画面で選ばれた「年代」(任意)を、本部DBの「年代」列にだけ記録する。
 //  ・年代が未選択、または想定外の値のときは、「年代」列を送らない(空欄のまま保存)。
-//  ・万一「年代」列が原因で本部への保存が失敗した場合は、年代なしでもう一度保存する
-//    (年代の不具合で、相談ログそのものが消えないようにするため)。
 
 const NOTION_VERSION = "2022-06-28";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -159,8 +164,8 @@ async function createNotionPage(apiKey, databaseId, properties) {
   }
 }
 
-// ---- ① 本部「Rena管理用データベース」向け(15項目・店舗名と年代あり) ----
-function buildHqProperties({ salonName, sessionId, userMessage, assistantMessage, insights, ageGroup }) {
+// ---- ① 本部「Rena管理用データベース」向け(店舗名・年代・ご利用者の名前あり) ----
+function buildHqProperties({ salonName, sessionId, userMessage, assistantMessage, insights, ageGroup, customerName }) {
   const properties = {
     相談タイトル: { title: [{ type: "text", text: { content: insights.title || "ご相談" } }] },
     店舗名: { rich_text: toRichText(salonName) },
@@ -179,6 +184,8 @@ function buildHqProperties({ salonName, sessionId, userMessage, assistantMessage
   };
   // 年代は任意。選ばれたときだけ送る(未選択は空欄=「未回答」として集計される)
   if (ageGroup) properties["年代"] = { select: { name: ageGroup } };
+  // ご利用者の名前(Ver.7)。null のときは列ごと送らない(リトライ用)
+  if (customerName !== null) properties["ご利用者の名前"] = { rich_text: toRichText(customerName || "ゲスト") };
   return properties;
 }
 
@@ -208,13 +215,17 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { sessionId, userMessage, assistantMessage, ageGroup: rawAgeGroup } = req.body || {};
+  const body = req.body || {};
+  const { sessionId, userMessage, assistantMessage, ageGroup: rawAgeGroup } = body;
   if (!sessionId || !userMessage || !assistantMessage) {
     return res.status(400).json({ error: "sessionId, userMessage, assistantMessage は必須です" });
   }
 
   // 想定外の値は無視する(Notionの選択肢に勝手な値が増えるのを防ぐ)
   const ageGroup = AGE_OPTIONS.includes(rawAgeGroup) ? rawAgeGroup : "";
+
+  // お名前(任意)。画面側の送り方の違いに備えて、いくつかの名前で受け取れるようにしておく
+  const customerName = String(body.customerName || body.guestName || body.name || "").trim().slice(0, 50);
 
   const salonName = process.env.SALON_NAME || "レブレ";
 
@@ -227,7 +238,7 @@ module.exports = async function handler(req, res) {
     createNotionPage(
       process.env.NOTION_API_KEY,
       process.env.NOTION_DATABASE_ID,
-      buildHqProperties({ ...hqArgs, ageGroup })
+      buildHqProperties({ ...hqArgs, ageGroup, customerName })
     ),
     createNotionPage(
       process.env.NOTION_API_KEY_PARTNER,
@@ -236,14 +247,14 @@ module.exports = async function handler(req, res) {
     ),
   ]);
 
-  // 「年代」列が原因で本部への保存だけ失敗した場合は、年代なしでもう一度保存する
+  // 「年代」「ご利用者の名前」列が原因で本部への保存だけ失敗した場合は、その2つを外してもう一度保存する
   let hqResult = hqFirst;
-  if (!hqFirst.ok && hqFirst.reason === "notion_error" && ageGroup) {
-    console.error("HQ write failed with ageGroup; retrying without it");
+  if (!hqFirst.ok && hqFirst.reason === "notion_error") {
+    console.error("HQ write failed; retrying without ageGroup / customerName");
     hqResult = await createNotionPage(
       process.env.NOTION_API_KEY,
       process.env.NOTION_DATABASE_ID,
-      buildHqProperties({ ...hqArgs, ageGroup: "" })
+      buildHqProperties({ ...hqArgs, ageGroup: "", customerName: null })
     );
   }
 
